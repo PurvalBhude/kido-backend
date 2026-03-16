@@ -104,77 +104,68 @@ app.use((req, res) => {
 
 app.use(errorHandler);
 
-// ==================== SERVER STARTUP ====================
+// ==================== BACKGROUND INITIALIZATIONS ====================
 
-const startServer = async () => {
-  try {
-    // Connect to database
-    await connectDB();
+// Connect to database without blocking the Express export
+connectDB();
 
-    // Initialize email transporter
-    try {
-      await initializeTransporter();
-      logger.info('✅ Email service initialized successfully');
-    } catch (emailError) {
-      logger.warn('⚠️ Email service initialization warning:', emailError.message);
-      logger.warn('⚠️ Email notifications may not work. Check SMTP configuration.');
-    }
-
-    // Start server - only if not running in Vercel serverless environment
-    if (!process.env.VERCEL) {
-      app.listen(PORT, () => {
-        logger.info(`
-  ╔════════════════════════════════════════╗
-  ║   🎪 KidsFest API Server Started 🎪   ║
-  ╠════════════════════════════════════════╣
-  ║ Environment: ${process.env.NODE_ENV || 'development'.padEnd(20)} │
-  ║ Port: ${PORT.toString().padEnd(31)} │
-  ║ Database: MongoDB                      ║
-  ║ Payment: ${(process.env.RAZORPAY_KEY_ID ? 'Razorpay' : 'Not Configured').padEnd(24)} │
-  ║ Media: ${(process.env.CLOUDINARY_CLOUD_NAME ? 'Cloudinary' : 'Not Configured').padEnd(26)} │
-  ║ Email: ${(process.env.SMTP_EMAIL ? 'Configured' : 'Not Configured').padEnd(27)} │
-  ╚════════════════════════════════════════╝
-        `);
-      });
-    } else {
-      logger.info('Running in Vercel Serverless mode - skipped app.listen');
-    }
-  } catch (error) {
-    logger.error('Failed to start server:', error);
-    process.exit(1);
-  }
-};
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully...');
-  mongoose.connection.close(() => {
-    logger.info('MongoDB connection closed');
-    process.exit(0);
+// Initialize email transporter asynchronously
+initializeTransporter()
+  .then(() => logger.info('✅ Email service initialized successfully'))
+  .catch((emailError) => {
+    logger.warn('⚠️ Email service initialization warning:', emailError.message);
+    logger.warn('⚠️ Email notifications may not work. Check SMTP configuration.');
   });
-});
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully...');
-  mongoose.connection.close(() => {
-    logger.info('MongoDB connection closed');
-    process.exit(0);
+// ==================== LOCAL DEVELOPMENT STARTUP ====================
+
+// Only bind the port if we are NOT running in Vercel's serverless environment
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    logger.info(`
+╔════════════════════════════════════════╗
+║   🎪 KidsFest API Server Started 🎪   ║
+╠════════════════════════════════════════╣
+║ Environment: ${process.env.NODE_ENV || 'development'.padEnd(20)} │
+║ Port: ${PORT.toString().padEnd(31)} │
+║ Database: MongoDB                      ║
+║ Payment: ${(process.env.RAZORPAY_KEY_ID ? 'Razorpay' : 'Not Configured').padEnd(24)} │
+║ Media: ${(process.env.CLOUDINARY_CLOUD_NAME ? 'Cloudinary' : 'Not Configured').padEnd(26)} │
+║ Email: ${(process.env.SMTP_EMAIL ? 'Configured' : 'Not Configured').padEnd(27)} │
+╚════════════════════════════════════════╝
+    `);
   });
-});
+
+  // Graceful shutdown local handlers
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM received, shutting down gracefully...');
+    mongoose.connection.close(() => {
+      logger.info('MongoDB connection closed');
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    logger.info('SIGINT received, shutting down gracefully...');
+    mongoose.connection.close(() => {
+      logger.info('MongoDB connection closed');
+      process.exit(0);
+    });
+  });
+}
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
-  process.exit(1);
+  // Don't process.exit in serverless
+  if (!process.env.VERCEL) process.exit(1);
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  if (!process.env.VERCEL) process.exit(1);
 });
 
-// Start the server
-startServer();
-
+// Export the instantly-ready Express app for Vercel to route HTTP requests to
 export default app;
