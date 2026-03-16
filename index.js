@@ -120,21 +120,25 @@ const startServer = async () => {
       logger.warn('⚠️ Email notifications may not work. Check SMTP configuration.');
     }
 
-    // Start server
-    app.listen(PORT, () => {
-      logger.info(`
-╔════════════════════════════════════════╗
-║   🎪 KidsFest API Server Started 🎪   ║
-╠════════════════════════════════════════╣
-║ Environment: ${process.env.NODE_ENV || 'development'.padEnd(20)} │
-║ Port: ${PORT.toString().padEnd(31)} │
-║ Database: MongoDB                      ║
-║ Payment: ${(process.env.RAZORPAY_KEY_ID ? 'Razorpay' : 'Not Configured').padEnd(24)} │
-║ Media: ${(process.env.CLOUDINARY_CLOUD_NAME ? 'Cloudinary' : 'Not Configured').padEnd(26)} │
-║ Email: ${(process.env.SMTP_EMAIL ? 'Configured' : 'Not Configured').padEnd(27)} │
-╚════════════════════════════════════════╝
-      `);
-    });
+    // Start server - only if not running in Vercel serverless environment
+    if (!process.env.VERCEL) {
+      app.listen(PORT, () => {
+        logger.info(`
+  ╔════════════════════════════════════════╗
+  ║   🎪 KidsFest API Server Started 🎪   ║
+  ╠════════════════════════════════════════╣
+  ║ Environment: ${process.env.NODE_ENV || 'development'.padEnd(20)} │
+  ║ Port: ${PORT.toString().padEnd(31)} │
+  ║ Database: MongoDB                      ║
+  ║ Payment: ${(process.env.RAZORPAY_KEY_ID ? 'Razorpay' : 'Not Configured').padEnd(24)} │
+  ║ Media: ${(process.env.CLOUDINARY_CLOUD_NAME ? 'Cloudinary' : 'Not Configured').padEnd(26)} │
+  ║ Email: ${(process.env.SMTP_EMAIL ? 'Configured' : 'Not Configured').padEnd(27)} │
+  ╚════════════════════════════════════════╝
+        `);
+      });
+    } else {
+      logger.info('Running in Vercel Serverless mode - skipped app.listen');
+    }
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
